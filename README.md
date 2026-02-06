@@ -1,2 +1,9 @@
 # robot_learning
-Repository for all code for the 16831 final project.
+
+To run ADB on Bluestacks go to **Settings** &rarr; **Advanced** &rarr; **Android Debug Bridge (ADB)**
+## Required Installation
+`pip install pure-python-adb`
+
+Then do this
+### For mac:
+`brew install android-platform-tools`
