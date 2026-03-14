@@ -25,8 +25,9 @@ def get_screen_rgb():
     # Convert to image
     image = Image.open(io.BytesIO(raw))
 
-    # Convert to numpy array (H x W x 3)
+    # Convert to numpy array (H x W x 4)
     rgb = np.array(image)
+    rgb = rgb[:, :, :3]  # Keep only the first 3 channels (RGB, ignore alpha)
 
     return rgb
 
@@ -84,6 +85,16 @@ def pixel_inspector(rgb):
 
     cv2.destroyAllWindows()
 
+def read_elixir_bar(rgb):
+    # Example: Check a specific region for elixir bar color
+    # This is just a placeholder and may need to be adjusted based on the actual game UI
+    elixir_region = rgb[2480, 540:1400:100, :]  # Adjust these coordinates as needed
+    elixir_region = np.vstack((rgb[2480,480], elixir_region))
+    count = 0
+    for pixel in elixir_region:
+        if pixel[0] >= 200 and pixel[1] >= 100 and pixel[2] >= 200:  count += 1
+    
+    return count
 
 def main():
     """Main entry point of the program."""
@@ -94,9 +105,10 @@ def main():
     # Run the agent in a loop
     try:
         rgb = get_screen_rgb()
-        print("Captured screen RGB data. Starting pixel inspector...")
-        pixel_inspector(rgb[:, :,:3])  # Pass only RGB channels to the inspector
-
+        elixir_level = read_elixir_bar(rgb)
+        print(f"Elixir level: {elixir_level}")
+        pixel_inspector(rgb)
+        
     except KeyboardInterrupt:
         print("Agent stopped.")
 
