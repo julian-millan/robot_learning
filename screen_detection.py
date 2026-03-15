@@ -24,6 +24,7 @@ banner_color = np.array([38, 99, 176])  # Example RGB for win/lose banner
 win_color = np.array([102, 255, 255])  # Example RGB for win banner
 lose_color = np.array([255, 204, 255])  # Example RGB for lose banner
 crown_color = np.array([231, 193, 58])  # Example RGB for crown icon on win banner
+hit_color = np.array([178, 178, 179]) # Example RGB for hit marker on tower health bars
 
 banner_pixel = (726, 1442)  # Example pixel location for win/lose banner
 win_pixel = (721, 1036)  # Example pixel location for win banner
@@ -128,8 +129,14 @@ def read_elixir_bar(rgb):
     return count
 
 def check_win_condition(rgb):
-    # Example: Check a specific region for win/lose screen colors
-    # This is just a placeholder and may need to be adjusted based on the actual game UI
+    """Check the win condition based on the screen RGB values.
+
+    Args:
+        rgb (np.ndarray): The RGB values of the screen as a 3D numpy array (height x width x 3).
+
+    Returns:
+        str: "Win", "Loss", or "In Progress" based on the game state.
+    """
     if check_pixel_color(rgb[banner_pixel[1], banner_pixel[0]], banner_color):
         if check_pixel_color(rgb[win_pixel[1], win_pixel[0]], win_color):
             return "Win"
@@ -140,7 +147,7 @@ def check_win_condition(rgb):
     else:
         return "In Progress"
     
-def check_pixel_color(pixel_rgb, target_rgb, tolerance=20):
+def check_pixel_color(pixel_rgb, target_rgb, tolerance=30):
     """Check if a pixel's color matches a target color within a tolerance.
 
     Args:
@@ -166,14 +173,14 @@ def check_tower_health(rgb, tower_color):
     """
     if tower_color == "red":
         bar_color = red_health
-        health_region = rgb[390, 288:440, :]  # Adjust these coordinates as needed
-        health_region = np.vstack((health_region, rgb[390, 1043:1197, :])) # combine both princess towers
+        princess_region = rgb[390, 288:440, :]  # Adjust these coordinates as needed
+        princess_region = np.vstack((princess_region, rgb[390, 1043:1197, :])) # combine both princess towers
         crown_pixel = rgb[enemy_crown_pixel[1], enemy_crown_pixel[0]]
         crown_region = rgb[100,645:854,:]
     elif tower_color == "blue":
         bar_color = blue_health
-        health_region = rgb[1590, 288:440, :]  # Adjust these coordinates as needed
-        health_region = np.vstack((health_region, rgb[1590, 1043:1197, :])) # combine both princess towers
+        princess_region = rgb[1590, 288:440, :]  # Adjust these coordinates as needed
+        princess_region = np.vstack((princess_region, rgb[1590, 1043:1197, :])) # combine both princess towers
         crown_pixel = rgb[my_crown_pixel[1], my_crown_pixel[0]]
         crown_region = rgb[1934,645:854,:]
     elif tower_color == "both":
@@ -183,15 +190,17 @@ def check_tower_health(rgb, tower_color):
     else:
         raise ValueError("Invalid tower color. Choose 'red', 'blue', or 'both'.")
 
-    total_pixels =  health_region.shape[0] # number of pixels in the health region (both princess towers combined)
-    princess_percentage = sum(check_pixel_color(health_region[i], bar_color) for i in range(total_pixels))/ total_pixels
+    total_pixels =  princess_region.shape[0] # number of pixels in the health region (both princess towers combined)
+    princess_percentage = sum(check_pixel_color(princess_region[i], bar_color) or check_pixel_color(princess_region[i], hit_color)
+                              for i in range(total_pixels))/ total_pixels
 
     if check_pixel_color(crown_pixel, crown_color):
         print("Crown detected, assuming full health for king tower")    
         crown_percentage = 1.0
     else:
-        crown_percentage = sum(check_pixel_color(crown_region[i], bar_color) for i in range(crown_region.shape[0]))/ crown_region.shape[0]
-
+        crown_percentage = sum(check_pixel_color(crown_region[i], bar_color) or check_pixel_color(crown_region[i], hit_color)
+                               for i in range(crown_region.shape[0]))/ crown_region.shape[0]
+    print(f"Princess tower health percentage: {princess_percentage:.2f}, Crown region health percentage: {crown_percentage:.2f}")
     return (princess_percentage*2/3.6 + crown_percentage*1.6/3.6) # scaled assuming princess towers are roughly 60% of king tower
 
 
@@ -208,10 +217,9 @@ def main():
         win_status = check_win_condition(rgb)
         print(f"Elixir level: {elixir_level}")
         print(f"Win status: {win_status}")
-        health = check_tower_health(rgb, "red")
-        print(f"Tower health: {health:.2f}")
+        health = check_tower_health(rgb, "both")
+        print(f"Red Tower health: {health[1]:.2f}, Blue Tower health: {health[0]:.2f}")
         pixel_inspector(rgb)
-        
     except KeyboardInterrupt:
         print("Agent stopped.")
 
