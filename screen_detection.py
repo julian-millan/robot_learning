@@ -96,16 +96,16 @@ def pixel_inspector(rgb):
     cv2.namedWindow("Pixel Inspector")
     cv2.setMouseCallback("Pixel Inspector", mouse_move)
 
-    while True:
-        cv2.imshow("Pixel Inspector", display)
+    # while True:
+    #     cv2.imshow("Pixel Inspector", display)
 
-        key = cv2.waitKey(20) & 0xFF
+    #     key = cv2.waitKey(20) & 0xFF
 
-        if key == ord('q') or key == 27:
-            break
+    #     if key == ord('q') or key == 27:
+    #         break
 
-        if cv2.getWindowProperty("Pixel Inspector", cv2.WND_PROP_VISIBLE) < 1:
-            break
+    #     if cv2.getWindowProperty("Pixel Inspector", cv2.WND_PROP_VISIBLE) < 1:
+    #         break
 
     cv2.destroyAllWindows()
 
@@ -219,7 +219,7 @@ def main():
         print(f"Win status: {win_status}")
         health = check_tower_health(rgb, "both")
         print(f"Red Tower health: {health[1]:.2f}, Blue Tower health: {health[0]:.2f}")
-        pixel_inspector(rgb)
+        # pixel_inspector(rgb)
     except KeyboardInterrupt:
         print("Agent stopped.")
 

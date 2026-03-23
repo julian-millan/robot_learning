@@ -3,6 +3,9 @@ import time
 import ppadb
 from ppadb.client import Client as AdbClient
 
+#### MAYBE RUN THIS In Terminal
+## & "C:\Program Files\BlueStacks_nxt\HD-Adb.exe" connect 127.0.0.1:5555
+
 print("Starting Random Card Play Agent for Bluestacks Emulator")
 # 1. Connect to Bluestacks ADB server
 client = AdbClient(host="127.0.0.1", port=5037)  # Default Bluestacks ADB port
@@ -40,6 +43,7 @@ def get_screen_size(device):
     result = device.shell("wm size")
     size_str = result.split(":")[-1].strip() # Get the "1080x1920" part
     width, height = map(int, size_str.split("x"))
+    # print(width, height) our size is 2560x1440
     return width, height
 
 width, height = get_screen_size(device)
