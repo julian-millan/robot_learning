@@ -29,8 +29,8 @@ hit_color = np.array([178, 178, 179]) # Example RGB for hit marker on tower heal
 banner_pixel = (726, 1442)  # Example pixel location for win/lose banner
 win_pixel = (721, 1036)  # Example pixel location for win banner
 lose_pixel = (685, 305)  # Example pixel location for lose banner
-my_crown_pixel = (746, 1923)  # Example pixel location for crown icon on win banner
-enemy_crown_pixel = (746, 74)  # Example pixel location for crown icon on lose banner
+my_crown_pixel = (722, 1917)  # Example pixel location for crown icon on win banner
+enemy_crown_pixel = (722, 63)  # Example pixel location for crown icon on lose banner
 
 def get_screen_rgb():
     """Capture the screen RGB values from the device.
@@ -195,12 +195,12 @@ def check_tower_health(rgb, tower_color):
                               for i in range(total_pixels))/ total_pixels
 
     if check_pixel_color(crown_pixel, crown_color):
-        print("Crown detected, assuming full health for king tower")    
+        #print("Crown detected, assuming full health for king tower")    
         crown_percentage = 1.0
     else:
         crown_percentage = sum(check_pixel_color(crown_region[i], bar_color) or check_pixel_color(crown_region[i], hit_color)
                                for i in range(crown_region.shape[0]))/ crown_region.shape[0]
-    print(f"Princess tower health percentage: {princess_percentage:.2f}, Crown region health percentage: {crown_percentage:.2f}")
+    #print(f"Princess tower health percentage: {princess_percentage:.2f}, Crown region health percentage: {crown_percentage:.2f}")
     return (princess_percentage*2/3.6 + crown_percentage*1.6/3.6) # scaled assuming princess towers are roughly 60% of king tower
 
 
