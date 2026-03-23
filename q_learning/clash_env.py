@@ -40,31 +40,61 @@ class ClashRoyaleEnv(gym.Env):
 
     def step(self, action):
             # 1. Initialize required variables to prevent crash
+            elix_zero = False # only do an action with elixir available, helps with game state as well
             reward = 0.0
             done = False
             info = {}
 
-            # 2. EXECUTE ACTION FIRST (The agent chose this based on the PREVIOUS step's observation)
+            # GET THE CURRENT STATE
+            raw_rgb = sd.get_screen_rgb()
+            obs = cv2.resize(raw_rgb, (84, 84))
+            info["elixir"] = sd.read_elixir_bar(raw_rgb)
+            # Add a separate check for the elixir level at 0, potential end game signal
+            if sd.read_elixir_bar(raw_rgb) == 0:
+                print("No elixir detected, possible end game state. Checking win/loss conditions again to confirm.")
+                time.sleep(1) # Wait a moment for the end game screen to update
+                elix_zero = True # update our status
+                action = 0
+
+            
+            win_status = sd.check_win_condition(raw_rgb)
+            if win_status == "Win":
+                reward = 1000.0  # Massive bonus for winning
+                done = True
+                action = 0 # override action to do nothing if we already won, just to be safe
+                return obs, reward, done, False, info
+            elif win_status == "Loss":
+                reward = -1000.0 # Massive penalty for losing
+                done = True  
+                action = 0 # override action to do nothing if we already lost, just to be safe
+                return obs, reward, done, False, info
+
+            # EXECUTE ACTION  (The agent chose this based on the PREVIOUS step's observation)
             if action != 0: 
                 self._execute_adb_tap(action)
                 
             # Wait for the game to register the tap and animations to play
             time.sleep(0.5)
 
-            # 3. GET THE NEW STATE (This is the result of the action)
+            # Get new state after action is executed and the game has updated
             raw_rgb = sd.get_screen_rgb()
             obs = cv2.resize(raw_rgb, (84, 84))
 
             # 4. CHECK IF GAME IS OVER
             win_status = sd.check_win_condition(raw_rgb)
+            info["elixir"] = sd.read_elixir_bar(raw_rgb)
             
             if win_status == "Win":
                 reward = 1000.0  # Massive bonus for winning
                 done = True
-            if win_status == "Loss":
+                return obs, reward, done, False, info
+            elif win_status == "Loss":
                 reward = -1000.0 # Massive penalty for losing
                 done = True
-            if not done:
+                return obs, reward, done, False, info
+
+            # only calculate ongoing reward if the game is still in progress and we have elixir to work with, otherwise we might be calculating deltas during the end game screen which could be noisy and not meaningful    
+            if not done and not elix_zero: 
                 # 5. CALCULATE ONGOING REWARD (Using Deltas)
                 blue_health, red_health = sd.check_tower_health(raw_rgb, "both")
 
@@ -99,7 +129,8 @@ class ClashRoyaleEnv(gym.Env):
         
         # 1. Tap the "OK" button on the win/loss banner
         # (You will need to find the exact X Y coordinates using your pixel_inspector)
-        sd.device.shell("input tap 800 2350") # Replace with real OK button coords
+        sd.device.shell("input tap 800 2250") # Replace with real OK button coords
+        sd.device.shell("input tap 725 2250") # double tap to secure right ok button
         print("waiting for menu to load...")
         time.sleep(6) # Wait for menu to load
         

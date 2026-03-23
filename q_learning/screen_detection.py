@@ -20,35 +20,54 @@ device = devices[0]
 red_health = np.array([226, 38, 94])  # Example RGB for red health bar
 blue_health = np.array([114, 210, 255])  # Example RGB for blue health bar
 elixir_color = np.array([240, 137, 244])  # Example RGB for elixir bar
-banner_color = np.array([38, 99, 176])  # Example RGB for win/lose banner
-win_color = np.array([102, 255, 255])  # Example RGB for win banner
-lose_color = np.array([255, 204, 255])  # Example RGB for lose banner
+banner_color = np.array([155, 13, 68])  # Example RGB for win/lose banner
+win_colors = [np.array([102, 255, 255]), np.array([235, 143, 35]), np.array([248, 192, 78]), np.array([254, 217, 100])]  # Example RGB for win banner
+lose_colors = [np.array([255, 204, 255]), np.array([235, 143, 35]), np.array([248, 192, 78]), np.array([254, 217, 100])]  # Example RGB for lose banner
 crown_color = np.array([231, 193, 58])  # Example RGB for crown icon on win banner
 hit_color = np.array([178, 178, 179]) # Example RGB for hit marker on tower health bars
 
-banner_pixel = (726, 1442)  # Example pixel location for win/lose banner
+banner_pixel = (726, 687)  # Example pixel location for win/lose banner
 win_pixel = (721, 1036)  # Example pixel location for win banner
 lose_pixel = (685, 305)  # Example pixel location for lose banner
-my_crown_pixel = (746, 1923)  # Example pixel location for crown icon on win banner
-enemy_crown_pixel = (746, 74)  # Example pixel location for crown icon on lose banner
+my_crown_pixel = (722, 1917)  # Example pixel location for crown icon on win banner
+enemy_crown_pixel = (722, 63)  # Example pixel location for crown icon on lose banner
+
+from PIL import UnidentifiedImageError # Add this to your imports at the top
+import time
+import io
+
+# ... existing code ...
 
 def get_screen_rgb():
-    """Capture the screen RGB values from the device.
+    max_retries = 5
+    
+    for attempt in range(max_retries):
+        try:
+            # 1. Capture the raw screen bytes via your ADB device
+            raw = device.screencap() 
+            
+            # (Optional Windows Bug Fix: Uncomment the line below if the error persists)
+            # raw = raw.replace(b'\r\n', b'\n') 
 
-    Returns:
-        np.ndarray: The RGB values of the screen as a 3D numpy array (height x width x 3).
-    """
-    # Capture screenshot from device
-    raw = device.screencap()
+            # 2. Try to open the image
+            image = Image.open(io.BytesIO(raw))
+            
+            # Convert to numpy array (H x W x 4)
+            rgb = np.array(image)
+            rgb = rgb[:, :, :3]  # Keep only the first 3 channels (RGB, ignore alpha)
+            return rgb 
+            
+        except UnidentifiedImageError:
+            print(f"⚠️ ADB dropped a frame (Attempt {attempt + 1}/{max_retries}). Retrying in 1 second...")
+            time.sleep(1)
+            
+        except Exception as e:
+            # Catching generic ADB disconnect errors
+            print(f"⚠️ ADB Error: {e}")
+            time.sleep(1)
 
-    # Convert to image
-    image = Image.open(io.BytesIO(raw))
-
-    # Convert to numpy array (H x W x 4)
-    rgb = np.array(image)
-    rgb = rgb[:, :, :3]  # Keep only the first 3 channels (RGB, ignore alpha)
-
-    return rgb
+    # If it fails 3 times in a row, Bluestacks or ADB has likely crashed completely.
+    raise Exception(f"CRITICAL: Failed to capture screen after {max_retries} attempts. Please check Bluestacks and your ADB connection.")
 
 def click(event,x,y,flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -96,16 +115,16 @@ def pixel_inspector(rgb):
     cv2.namedWindow("Pixel Inspector")
     cv2.setMouseCallback("Pixel Inspector", mouse_move)
 
-    # while True:
-    #     cv2.imshow("Pixel Inspector", display)
+    while True:
+        cv2.imshow("Pixel Inspector", display)
 
-    #     key = cv2.waitKey(20) & 0xFF
+        key = cv2.waitKey(20) & 0xFF
 
-    #     if key == ord('q') or key == 27:
-    #         break
+        if key == ord('q') or key == 27:
+            break
 
-    #     if cv2.getWindowProperty("Pixel Inspector", cv2.WND_PROP_VISIBLE) < 1:
-    #         break
+        if cv2.getWindowProperty("Pixel Inspector", cv2.WND_PROP_VISIBLE) < 1:
+            break
 
     cv2.destroyAllWindows()
 
@@ -138,10 +157,12 @@ def check_win_condition(rgb):
         str: "Win", "Loss", or "In Progress" based on the game state.
     """
     if check_pixel_color(rgb[banner_pixel[1], banner_pixel[0]], banner_color):
-        if check_pixel_color(rgb[win_pixel[1], win_pixel[0]], win_color):
-            return "Win"
-        elif check_pixel_color(rgb[lose_pixel[1], lose_pixel[0]], lose_color):
-            return "Loss"
+        for color in win_colors:
+            if check_pixel_color(rgb[win_pixel[1], win_pixel[0]], color):
+                return "Win"
+        for color in lose_colors:
+            if check_pixel_color(rgb[lose_pixel[1], lose_pixel[0]], color):
+                return "Loss"
         else:
             return "Unknown Result"
     else:
@@ -219,7 +240,7 @@ def main():
         print(f"Win status: {win_status}")
         health = check_tower_health(rgb, "both")
         print(f"Red Tower health: {health[1]:.2f}, Blue Tower health: {health[0]:.2f}")
-        # pixel_inspector(rgb)
+        pixel_inspector(rgb)
     except KeyboardInterrupt:
         print("Agent stopped.")
 
