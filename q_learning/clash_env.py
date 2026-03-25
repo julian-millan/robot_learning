@@ -29,12 +29,12 @@ class ClashRoyaleEnv(gym.Env):
         self.arena_x_max = 1300
         self.arena_y_min = 150 # allow placement near the top of the arena, this gets unlocked after tower destruction for troops, but spells can always go anywhere
         self.arena_y_max = 1880
-        self.grid_rows = 32 # 32 tiles long by 18 tiles wide is the full size of the arena
-        self.grid_cols = 18
+        self.grid_rows = 16 # 32 tiles long by 18 tiles wide is the full size of the arena
+        self.grid_cols = 9
         self.tap_delay = 0.2
         # Discretize the gamespace grid
-        self.zones = self.grid_rows * self.grid_cols # 32*18 = 576 discrete zones to place cards in
-        # 4 cards * 576 zones = 2304 discrete actions + 1 "Do nothing" action = 2305 total actions
+        self.zones = self.grid_rows * self.grid_cols # 16*9 = 144 zones, coarse grid approach to improve training speed
+        # 4 cards * 144 zones = 576 discrete actions + 1 "Do nothing" action = 577 total actions
         self.actions = self.zones * len(self.card_slots_x) + 1 # +1 for "Do nothing" action
         self.action_space = spaces.Discrete(self.actions)
 
@@ -46,35 +46,20 @@ class ClashRoyaleEnv(gym.Env):
             info = {}
 
             # GET THE CURRENT STATE
-            raw_rgb = sd.get_screen_rgb()
-            obs = cv2.resize(raw_rgb, (84, 84))
-            info["elixir"] = sd.read_elixir_bar(raw_rgb)
+            raw_rgb = sd.get_screen_rgb() # check the screen twice is time expensive, but we need this to create a good gameplay loop
             # Add a separate check for the elixir level at 0, potential end game signal
             if sd.read_elixir_bar(raw_rgb) == 0:
                 print("No elixir detected, possible end game state. Checking win/loss conditions again to confirm.")
-                time.sleep(1) # Wait a moment for the end game screen to update
+                time.sleep(0.1) # Wait a moment for the end game screen to update
                 elix_zero = True # update our status
                 action = 0
-
-            
-            win_status = sd.check_win_condition(raw_rgb)
-            if win_status == "Win":
-                reward = 1000.0  # Massive bonus for winning
-                done = True
-                action = 0 # override action to do nothing if we already won, just to be safe
-                return obs, reward, done, False, info
-            elif win_status == "Loss":
-                reward = -1000.0 # Massive penalty for losing
-                done = True  
-                action = 0 # override action to do nothing if we already lost, just to be safe
-                return obs, reward, done, False, info
 
             # EXECUTE ACTION  (The agent chose this based on the PREVIOUS step's observation)
             if action != 0: 
                 self._execute_adb_tap(action)
                 
             # Wait for the game to register the tap and animations to play
-            time.sleep(0.5)
+            time.sleep(0.1)
 
             # Get new state after action is executed and the game has updated
             raw_rgb = sd.get_screen_rgb()
@@ -113,13 +98,12 @@ class ClashRoyaleEnv(gym.Env):
                 # Example: We take 0.1 damage (blue_delta = -0.1). They take 0.2 damage (red_delta = -0.2).
                 # (-0.1) - (-0.2) = +0.1 net positive reward!
                 reward = (blue_delta - red_delta) * 100
+                if blue_delta - red_delta == 0:
+                    reward = 50 # small reward for not losing damage, or defending properly
                 
                 # 6. Update trackers for the NEXT step
                 self.prev_blue_health = blue_health
                 self.prev_red_health = red_health
-
-            # Populate info dict using the new state
-            info["elixir"] = sd.read_elixir_bar(raw_rgb)
 
             return obs, reward, done, False, info
 
@@ -158,7 +142,7 @@ class ClashRoyaleEnv(gym.Env):
 
         # action 1..2304 -> 4 cards x (32*18) placement cells
         action_idx = action - 1 # Shift down by 1 to make it zero-indexed
-        cells_per_card = self.grid_rows * self.grid_cols # 32*18 = 576
+        cells_per_card = self.zones # 32*18 = 576
         card_idx = action_idx // cells_per_card # Determine which card to play (0-3)
         cell_idx = action_idx % cells_per_card # Determine which cell in the grid to place the card (0-575)
 
