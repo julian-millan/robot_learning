@@ -7,6 +7,8 @@ import cv2
 
 
 print("Starting Screen Detection for Bluestacks Emulator")
+import subprocess
+subprocess.run(['adb', 'connect', '127.0.0.1:5555'], capture_output=True, text=True)
 client = AdbClient(host="127.0.0.1", port=5037)
 print("Connected to ADB server at 127.0.0.1:5037")
 devices = client.devices()
@@ -202,6 +204,11 @@ def check_tower_health(rgb, tower_color):
                                for i in range(crown_region.shape[0]))/ crown_region.shape[0]
     #print(f"Princess tower health percentage: {princess_percentage:.2f}, Crown region health percentage: {crown_percentage:.2f}")
     return (princess_percentage*2/3.6 + crown_percentage*1.6/3.6) # scaled assuming princess towers are roughly 60% of king tower
+
+
+def is_in_match(rgb):
+    """Returns True if we're currently in a live battle (elixir bar is visible)."""
+    return read_elixir_bar(rgb) > 0
 
 
 def main():
