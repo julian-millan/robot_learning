@@ -38,6 +38,9 @@ class ClashRoyaleEnv(gym.Env):
         self.actions = self.zones * len(self.card_slots_x) + 1 # +1 for "Do nothing" action
         self.action_space = spaces.Discrete(self.actions)
 
+        # Store the state of the princess towers in class variables
+        self.first_red_dest = False
+
     def step(self, action):
             # 1. Initialize required variables to prevent crash
             elix_zero = False # only do an action with elixir available, helps with game state as well
@@ -81,7 +84,11 @@ class ClashRoyaleEnv(gym.Env):
             # only calculate ongoing reward if the game is still in progress and we have elixir to work with, otherwise we might be calculating deltas during the end game screen which could be noisy and not meaningful    
             if not done and not elix_zero: 
                 # 5. CALCULATE ONGOING REWARD (Using Deltas)
-                blue_health, red_health = sd.check_tower_health(raw_rgb, "both")
+                blue_health_list, red_health_list = sd.check_tower_health(raw_rgb, "both")
+                # extract the red and blue princess towers for reward shaping
+                first_red_p_tower  = red_health_list[0]
+                if first_red_p_tower <= 0.01:
+                    reward
 
                 # ensure no accidental tower healing via troop walking in place of destroyed tower
                 blue_health = min(blue_health, self.prev_blue_health)

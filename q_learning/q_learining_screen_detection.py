@@ -189,31 +189,39 @@ def check_tower_health(rgb, tower_color):
         tower_color (string): Which tower to check ("red", "blue" or "both").
 
     Returns:
-        tuple: The health percentage heuristic of the tower (0.0 to 1.0).
-        If "both" is selected, returns a tuple with both blue and red tower health percentages.
+        list: A list of the three tower healths in the order of first princess tower, second, and the crown tower.
+        If "both" is selected, returns a tuple with both blue and red tower health percentages in lists.
     """
     if tower_color == "red":
         bar_color = red_health
         princess_region = rgb[390, 288:440, :]  # Adjust these coordinates as needed
-        princess_region = np.vstack((princess_region, rgb[390, 1043:1197, :])) # combine both princess towers
+        # instead of combining the princess regions, define them separately
+        princess_region_2 = rgb[390, 1043:1197, :]
+        # princess_region = np.vstack((princess_region, rgb[390, 1043:1197, :])) # combine both princess towers
         crown_pixel = rgb[enemy_crown_pixel[1], enemy_crown_pixel[0]]
         crown_region = rgb[100,645:854,:]
     elif tower_color == "blue":
         bar_color = blue_health
         princess_region = rgb[1590, 288:440, :]  # Adjust these coordinates as needed
-        princess_region = np.vstack((princess_region, rgb[1590, 1043:1197, :])) # combine both princess towers
+        # instead of combining the princess regions, define them separately
+        princess_region_2 = rgb[1590, 1043:1197, :]
+        # princess_region = np.vstack((princess_region, rgb[1590, 1043:1197, :])) # combine both princess towers
         crown_pixel = rgb[my_crown_pixel[1], my_crown_pixel[0]]
         crown_region = rgb[1934,645:854,:]
     elif tower_color == "both":
         red_tower_health = check_tower_health(rgb, "red")
         blue_tower_health = check_tower_health(rgb, "blue")
-        return blue_tower_health,red_tower_health
+        return (blue_tower_health, red_tower_health)
     else:
         raise ValueError("Invalid tower color. Choose 'red', 'blue', or 'both'.")
 
-    total_pixels =  princess_region.shape[0] # number of pixels in the health region (both princess towers combined)
-    princess_percentage = sum(check_pixel_color(princess_region[i], bar_color) or check_pixel_color(princess_region[i], hit_color)
-                              for i in range(total_pixels))/ total_pixels
+    total_first_pixels =  princess_region.shape[0] # number of pixels in the health region (first princess tower)
+    total_second_pixels = princess_region_2.shape[0] # number of pixels in the second princess tower health
+    princess_percentage_first = sum(check_pixel_color(princess_region[i], bar_color) or check_pixel_color(princess_region[i], hit_color)
+                              for i in range(total_first_pixels))/ total_first_pixels
+    # Now do second princess tower
+    princess_percentage_second = sum(check_pixel_color(princess_region_2[i], bar_color) or check_pixel_color(princess_region_2[i], hit_color)
+                              for i in range(total_second_pixels))/ total_second_pixels
 
     if check_pixel_color(crown_pixel, crown_color):
         # print("Crown detected, assuming full health for king tower")    
@@ -221,8 +229,10 @@ def check_tower_health(rgb, tower_color):
     else:
         crown_percentage = sum(check_pixel_color(crown_region[i], bar_color) or check_pixel_color(crown_region[i], hit_color)
                                for i in range(crown_region.shape[0]))/ crown_region.shape[0]
-    # print(f"Princess tower health percentage: {princess_percentage:.2f}, Crown region health percentage: {crown_percentage:.2f}")
-    return (princess_percentage*2/3.6 + crown_percentage*1.6/3.6) # scaled assuming princess towers are roughly 60% of king tower
+    # Instead of returning a single value, return a list of the three tower healths
+    health_list = [princess_percentage_first, princess_percentage_second, crown_percentage]
+    # print(f" First Princess tower health percentage: {princess_percentage_first:.2f}, Second Princess tower health percentage: {princess_percentage_second:.2f}, Crown region health percentage: {crown_percentage:.2f}")
+    return health_list # list of 3 tower healths
 
 
 def main():

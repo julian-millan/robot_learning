@@ -34,9 +34,9 @@ except Exception as e:
         env,
         learning_rate=2.5e-4,
         buffer_size=50000,
-        exploration_initial_eps=1.0, # Start with full exploration when starting
-        exploration_final_eps=0.05, # End with a small amount of exploration     
-        exploration_fraction=0.95, 
+        exploration_initial_eps=0.0, # Start with full exploration when starting
+        exploration_final_eps=0.0, # End with a small amount of exploration     
+        # exploration_fraction=0.95, 
         verbose=1,
         tensorboard_log="./clash_stacked_tensorboard/",
         batch_size=128,
