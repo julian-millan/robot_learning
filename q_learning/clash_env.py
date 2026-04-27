@@ -14,9 +14,11 @@ class ClashRoyaleEnv(gym.Env):
 
         # OBSERVATION SPACE: We must downscale the massive phone screen to 84x84 for the CNN.
         # We keep 3 channels (RGB)
-        self.observation_space = spaces.Box(
-            low=0, high=255, shape=(84, 84, 3), dtype=np.uint8
-        )
+        # Now we also add elixir information into the observation space
+        self.observation_space = spaces.Dict({
+            "image": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
+            "elixir": spaces.Box(low=0.0, high=10.0, shape=(1,), dtype=np.float32)
+        })
         
         # Track previous health to calculate damage deltas for rewards
         self.prev_blue_health = 1.0
@@ -40,6 +42,10 @@ class ClashRoyaleEnv(gym.Env):
 
         # Store the state of the princess towers in class variables
         self.first_red_dest = False
+        self.second_red_dest = False # enemy towers
+        # our towers
+        self.first_blue_dest = False
+        self.second_blue_dest = False
 
     def step(self, action):
             # 1. Initialize required variables to prevent crash
@@ -66,18 +72,24 @@ class ClashRoyaleEnv(gym.Env):
 
             # Get new state after action is executed and the game has updated
             raw_rgb = sd.get_screen_rgb()
-            obs = cv2.resize(raw_rgb, (84, 84))
+            obs_image = cv2.resize(raw_rgb, (84, 84))
 
             # 4. CHECK IF GAME IS OVER
             win_status = sd.check_win_condition(raw_rgb)
             info["elixir"] = sd.read_elixir_bar(raw_rgb)
+            obs_elixir = np.array([info["elixir"]], dtype=np.float32)
+
+            obs = {
+                "image": obs_image,
+                "elixir": obs_elixir
+            }
             
             if win_status == "Win":
-                reward = 1000.0  # Massive bonus for winning
+                reward = 3000.0  # Massive bonus for winning, bumped up big time (x3) for better reward shaping
                 done = True
                 return obs, reward, done, False, info
             elif win_status == "Loss":
-                reward = -1000.0 # Massive penalty for losing
+                reward = -3000.0 # Massive penalty for losing
                 done = True
                 return obs, reward, done, False, info
 
@@ -87,9 +99,31 @@ class ClashRoyaleEnv(gym.Env):
                 blue_health_list, red_health_list = sd.check_tower_health(raw_rgb, "both")
                 # extract the red and blue princess towers for reward shaping
                 first_red_p_tower  = red_health_list[0]
-                if first_red_p_tower <= 0.01:
-                    reward
+                second_red_p_tower = red_health_list[1] # dont need to get king tower cuz thats the win condition
+                # blue towers
+                first_blue_p_tower = blue_health_list[0]
+                second_blue_p_tower = blue_health_list[1]
 
+                # Now check to see if any are destroyed, and implement reward shaping
+                if first_red_p_tower <= 0.01 and not self.first_red_dest:
+                    reward += 750.0 # big reward for destroying a tower
+                    self.first_red_dest = True # now set to True so we don't repeatedly reward for a destroyed tower
+                # Second red tower
+                if second_red_p_tower <= 0.01 and not self.second_red_dest:
+                    reward += 750.0 # big reward for destroying a tower
+                    self.second_red_dest = True # now set to True so we don't repeatedly reward for a destroyed tower
+
+                # Now check if any of our towers are destroyed
+                if first_blue_p_tower <= 0.01 and not self.first_blue_dest:
+                    reward -= 750.0 # big reward loss for losing a tower
+                    self.first_blue_dest = True # now set to True so we don't repeatedly reward for a destroyed tower
+                if second_blue_p_tower <= 0.01 and not self.second_blue_dest:
+                    reward -= 750.0
+                    self.second_blue_dest = True
+                
+                # now comibine all the tower healths into one for the rest of our reward shaping (health difference)
+                blue_health = ((first_blue_p_tower+second_blue_p_tower)/3.6) + blue_health_list[2]*1.6/3.6 # use our old estimation to recall the total health
+                red_health = ((first_red_p_tower+second_red_p_tower)/3.6) + red_health_list[2]*1.6/3.6
                 # ensure no accidental tower healing via troop walking in place of destroyed tower
                 blue_health = min(blue_health, self.prev_blue_health)
                 red_health = min(red_health, self.prev_red_health)
@@ -104,14 +138,13 @@ class ClashRoyaleEnv(gym.Env):
                 # Formula: (Our Health Kept) - (Their Health Kept)
                 # Example: We take 0.1 damage (blue_delta = -0.1). They take 0.2 damage (red_delta = -0.2).
                 # (-0.1) - (-0.2) = +0.1 net positive reward!
-                reward = (blue_delta - red_delta) * 100
+                reward += (blue_delta - red_delta) * 100
                 if blue_delta - red_delta == 0:
-                    reward = 50 # small reward for not losing damage, or defending properly
+                    reward += 50.0 # small reward for not losing damage, or defending properly
                 
                 # 6. Update trackers for the NEXT step
                 self.prev_blue_health = blue_health
                 self.prev_red_health = red_health
-
             return obs, reward, done, False, info
 
     def reset(self, seed=None):
@@ -135,11 +168,26 @@ class ClashRoyaleEnv(gym.Env):
         # Reset health trackers for the new game
         self.prev_blue_health = 1.0
         self.prev_red_health = 1.0 # intialize at full health
+
+        # Reset tower statuses
+        self.first_blue_dest = False
+        self.second_blue_dest = False
+        # Red
+        self.first_red_dest = False
+        self.second_red_dest = False
         
         # Grab the first frame of the new game
         raw_rgb = sd.get_screen_rgb()
-        obs = cv2.resize(raw_rgb, (84, 84))
-        
+        obs_image = cv2.resize(raw_rgb, (84, 84)) # redefined for our observation dictionary
+
+        # matches start with 5 elixir so reset our state to that. if it's wrong, it will get corrected fairly soon
+        obs_elixir = np.array([5.0], dtype=np.float32)
+
+        # now put our observation spaces into one obs dictionary
+        obs = {
+            "image": obs_image,
+            "elixir": obs_elixir
+        }
         return obs, {}
 
     def _execute_adb_tap(self, action):

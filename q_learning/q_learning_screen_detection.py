@@ -249,7 +249,7 @@ def main():
         print(f"Elixir level: {elixir_level}")
         print(f"Win status: {win_status}")
         health = check_tower_health(rgb, "both")
-        print(f"Red Tower health: {health[1]:.2f}, Blue Tower health: {health[0]:.2f}")
+        print(f"Red Towers: {health[1]}, Blue Towers: {health[0]}")
         pixel_inspector(rgb)
     except KeyboardInterrupt:
         print("Agent stopped.")
