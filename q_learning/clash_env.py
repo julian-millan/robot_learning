@@ -6,7 +6,7 @@ import time
 from stable_baselines3 import DQN
 
 # Import your vision script!
-import screen_detection as sd 
+import q_learning_screen_detection as sd 
 
 class ClashRoyaleEnv(gym.Env):
     def __init__(self):
