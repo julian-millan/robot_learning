@@ -3,6 +3,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from clash_env import ClashRoyaleEnv
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack # for frame stacking
+import os
 
 import time
 
@@ -17,14 +18,14 @@ print("Loading saved agent...")
 # Make sure the filename matches what you saved it as (without the .zip extension)
 try:
     model = DQN.load("dqn_clash_elixir_v1", 
-                     env=env, tensorboard_log="./clash_stacked_tensorboard/",
+                     env=env, tensorboard_log="./clash_elixir_tensorboard/",
                      exploration_initial_eps=1.0, # Start with full exploration when resuming
-                     exploration_final_eps=0.05, # End with a small amount of exploration
-                       exploration_fraction=0.95, # Explore for 95% of the training time, locking in at 5% exploration for the last 5% of training
+                     exploration_final_eps=0.02, # End with a small amount of exploration
+                       exploration_fraction=0.99, # Explore for 99% of the training time, locking in at 2% exploration for the last 5% of training
                          learning_rate=2.5e-4,
                            batch_size=128,
                            replay_buffer_kwargs={"handle_timeout_termination": False},
-                           buffer_size=50000) # a little more epxloration
+                           buffer_size=10000) # a little more epxloration
     print("Agent loaded successfully!")
 except Exception as e:
     print(f"Failed to load saved agent. Reason: {e}")
@@ -32,7 +33,7 @@ except Exception as e:
         "MultiInputPolicy",           
         env,
         learning_rate=2.5e-4,
-        buffer_size=50000,
+        buffer_size=40000,
         exploration_initial_eps=1.0, # Start with full exploration when starting
         exploration_final_eps=0.02, # End with a small amount of exploration     
         exploration_fraction=0.99, 
@@ -41,11 +42,16 @@ except Exception as e:
         batch_size=128,
         replay_buffer_kwargs={"handle_timeout_termination": False} # error conflict with the above line
     )
+# 1. Ask Python to figure out exactly where train.py is located on your hard drive
+script_directory = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Tell it to make the save folder exactly next to train.py
+absolute_save_path = os.path.join(script_directory, 'stacked_models')
 
 # Create the checkpoint callback again so it keeps saving backups
 checkpoint_callback = CheckpointCallback(
-    save_freq=250,
-    save_path='./stacked_models/',
+    save_freq=100,
+    save_path=absolute_save_path,
     name_prefix='clash_dqn_elixir'
 )
 
@@ -58,7 +64,7 @@ custom_name = f"DQN_Run_{current_time}"
 model.learn(
     total_timesteps=6000, 
     callback=checkpoint_callback, 
-    reset_num_timesteps=False, 
+    reset_num_timesteps=True, 
     log_interval=1,
     tb_log_name=custom_name
 ) 
